@@ -114,6 +114,8 @@ void GlobalSFM::triangulateTwoFrames(int frame0, Eigen::Matrix<double, 3, 4> &Po
 //  c_translation cam_R_w
 // relative_q[i][j]  j_q_i
 // relative_t[i][j]  j_t_ji  (j < i)
+/* 纯视觉sfm，求解窗口中所有图像帧的位姿QT（相对于第l帧）和特征点坐标sfm_tracked_points
+   frame_num=frame_count + 1=11，frame_num-1表示当前帧*/
 bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 			  const Matrix3d relative_R, const Vector3d relative_T,
 			  vector<SFMFeature> &sfm_f, map<int, Vector3d> &sfm_tracked_points)
@@ -122,6 +124,8 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 	//cout << "set 0 and " << l << " as known " << endl;
 	// have relative_r relative_t
 	// intial two view
+	/*1、这里把第l帧看作参考坐标系，根据当前帧到第l帧的relative_R，relative_T，
+	得到当前帧在参考坐标系下的位姿，之后的pose[i]表示第l帧到第i帧的变换矩阵[R|T]*/
 	q[l].w() = 1;
 	q[l].x() = 0;
 	q[l].y() = 0;
@@ -155,6 +159,9 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 
 	//1: trangulate between l ----- frame_num - 1
 	//2: solve pnp l + 1; trangulate l + 1 ------- frame_num - 1; 
+	/*2、先三角化第l帧（参考帧）与第frame_num-1帧（当前帧）的路标点
+	  3、pnp求解参考坐标系到第l+1开始的每一帧的变换矩阵R_initial, P_initial，保存在Pose中。
+	并与当前帧进行三角化。*/
 	for (int i = l; i < frame_num - 1 ; i++)
 	{
 		// solve pnp
@@ -175,10 +182,12 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 		triangulateTwoFrames(i, Pose[i], frame_num - 1, Pose[frame_num - 1], sfm_f);
 	}
 	//3: triangulate l-----l+1 l+2 ... frame_num -2
+	/*4、对第l帧与从第l+1到frame_num-2的每一帧再进行三角化*/
 	for (int i = l + 1; i < frame_num - 1; i++)
 		triangulateTwoFrames(l, Pose[l], i, Pose[i], sfm_f);
 	//4: solve pnp l-1; triangulate l-1 ----- l
 	//             l-2              l-2 ----- l
+	/*5、PNP求解参考坐标系到从第l-1到第0帧的每一帧之间的变换矩阵，并进行三角化*/
 	for (int i = l - 1; i >= 0; i--)
 	{
 		//solve pnp
@@ -195,6 +204,7 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 		triangulateTwoFrames(i, Pose[i], l, Pose[l], sfm_f);
 	}
 	//5: triangulate all other points
+	/*6、三角化其他未恢复的特征点。至此得到了滑动窗口中所有图像帧的位姿以及特征点的3d坐标*/
 	for (int j = 0; j < feature_num; j++)
 	{
 		if (sfm_f[j].state == true)
@@ -230,6 +240,7 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 	}
 */
 	//full BA
+	/*7、使用ceres进行全局BA优化*/
 	ceres::Problem problem;
 	ceres::LocalParameterization* local_parameterization = new ceres::QuaternionParameterization();
 	//cout << " begin full BA " << endl;
@@ -287,6 +298,7 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 		//cout << "vision only BA not converge " << endl;
 		return false;
 	}
+	/*8、这里得到的是第l帧坐标系到各帧的变换矩阵，应将其转变为每一帧在第l帧坐标系上的位姿*/
 	for (int i = 0; i < frame_num; i++)
 	{
 		q[i].w() = c_rotation[i][0]; 

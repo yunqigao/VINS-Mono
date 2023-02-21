@@ -190,6 +190,34 @@ namespace cv {
 }
 
 
+/*
+Mat cv::findFundamentalMat(  
+    nputArray  points1,             //第一幅图像点的数组
+    InputArray  points2,            //第二幅图像点的数组
+    int     method = FM_RANSAC,     //RANSAC 算法
+    double  param1 = 3.,            //点到对极线的最大距离，超过这个值的点将被舍弃
+    double  param2 = 0.99,          //矩阵正确的可信度
+    OutputArray mask = noArray()    //输出在计算过程中没有被舍弃的点
+    )
+cv::Mat E = cv::findFundamentalMat(ll, rr, cv::FM_RANSAC, 0.3 / 460, 0.99, mask);
+函数findFundamentalMat()既可以用来求基本矩阵F，也可以求本质矩阵E。
+求什么取决于你的参数points1和points2是像素坐标还是归一化平面坐标。
+因为对极约束的式子是：X2TEX1=P2TFP1=0
+而在VINS初始化阶段都是用于求本质矩阵然后恢复Rt。
+*/
+/**
+ *  int cv::recoverPose (   通过本质矩阵得到Rt，返回通过手性校验的内点个数
+ *      InputArray  E,              本质矩阵
+ *      InputArray  points1,        第一幅图像点的数组
+ *      InputArray  points2,        第二幅图像点的数组
+ *      InputArray  cameraMatrix,   相机内参
+ *      OutputArray     R,          第一帧坐标系到第二帧坐标系的旋转矩阵
+ *      OutputArray     t,          第一帧坐标系到第二帧坐标系的平移向量
+ *      InputOutputArray    mask = noArray()  在findFundamentalMat()中没有被舍弃的点
+ *  )  
+int inlier_cnt = cv::recoverPose(E, ll, rr, cameraMatrix, rot, trans, mask);
+ */
+
 bool MotionEstimator::solveRelativeRT(const vector<pair<Vector3d, Vector3d>> &corres, Matrix3d &Rotation, Vector3d &Translation)
 {
     if (corres.size() >= 15)

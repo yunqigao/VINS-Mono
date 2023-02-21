@@ -16,13 +16,19 @@ void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
         tmp_A.setZero();
         VectorXd tmp_b(3);
         tmp_b.setZero();
+        /*R_ij = (R^c0_bk)^-1 * (R^c0_bk+1) 转换为四元数 q_ij = (q^c0_bk)^-1 * (q^c0_bk+1)*/
         Eigen::Quaterniond q_ij(frame_i->second.R.transpose() * frame_j->second.R);
+        /*tmp_A = J_j_bw*/
         tmp_A = frame_j->second.pre_integration->jacobian.template block<3, 3>(O_R, O_BG);
+        //tmp_b = 2 * ((r^bk_bk+1)^-1 * (q^c0_bk)^-1 * (q^c0_bk+1))_vec
+        //      = 2 * ((r^bk_bk+1)^-1 * q_ij)_vec
         tmp_b = 2 * (frame_j->second.pre_integration->delta_q.inverse() * q_ij).vec();
+        //tmp_A * delta_bg = tmp_b
         A += tmp_A.transpose() * tmp_A;
         b += tmp_A.transpose() * tmp_b;
 
     }
+    /*LDLT方法*/
     delta_bg = A.ldlt().solve(b);
     ROS_WARN_STREAM("gyroscope bias initial calibration " << delta_bg.transpose());
 
@@ -36,7 +42,7 @@ void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)
     }
 }
 
-
+/*以下函数对应论文中Algorithm 1，用于在半径为g的半球找到切面的一对正交基。*/
 MatrixXd TangentBasis(Vector3d &g0)
 {
     Vector3d b, c;
@@ -51,7 +57,7 @@ MatrixXd TangentBasis(Vector3d &g0)
     bc.block<3, 1>(0, 1) = c;
     return bc;
 }
-
+/*重力细化,在代码实现中，以下函数用于重力细化，其流程基本对应上文推导，方程迭代求解4次：*/
 void RefineGravity(map<double, ImageFrame> &all_image_frame, Vector3d &g, VectorXd &x)
 {
     Vector3d g0 = g.normalized() * G.norm();
@@ -121,7 +127,7 @@ void RefineGravity(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vector
     }   
     g = g0;
 }
-
+/*速度、重力和尺度初始化:里面的MatrixXd tmp_A(6, 10)就是H，VectorXd tmp_b(6,1)就是b*/
 bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, VectorXd &x)
 {
     int all_frame_count = all_image_frame.size();
@@ -177,10 +183,12 @@ bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vect
     A = A * 1000.0;
     b = b * 1000.0;
     x = A.ldlt().solve(b);
+    /*最后求得尺度s和重力加速度g*/
     double s = x(n_state - 1) / 100.0;
     ROS_DEBUG("estimated scale: %f", s);
     g = x.segment<3>(n_state - 4);
     ROS_DEBUG_STREAM(" result g     " << g.norm() << " " << g.transpose());
+    //如果重力加速度与参考值差太大或者尺度为负则说明计算错误
     if(fabs(g.norm() - G.norm()) > 1.0 || s < 0)
     {
         return false;
