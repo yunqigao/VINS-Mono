@@ -1,3 +1,4 @@
+/*紧耦合的VIO状态估计器实现*/
 #include "estimator.h"
 
 Estimator::Estimator(): f_manager{Rs}
@@ -121,28 +122,37 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
 {
     ROS_DEBUG("new image coming ------------------------------------------");
     ROS_DEBUG("Adding feature points %lu", image.size());
+    /*
+    1、addFeatureCheckParallax()添加之前检测到的特征点到feature容器list中，计算每一个点跟踪的次数，
+    以及它的视差并通过检测两帧之间的视差决定是否作为关键帧。
+    param[in] frame_count 窗口内帧的个数
+    param[in] image 某帧所有特征点的[camera_id,[x,y,z,u,v,vx,vy]]构成的map,索引为feature_id
+    param[in] td 相机和IMU同步校准得到的时间差
+    */
     if (f_manager.addFeatureCheckParallax(frame_count, image, td))
-        marginalization_flag = MARGIN_OLD;
+        marginalization_flag = MARGIN_OLD;//=0
     else
-        marginalization_flag = MARGIN_SECOND_NEW;
+        marginalization_flag = MARGIN_SECOND_NEW;//=1
 
     ROS_DEBUG("this frame is--------------------%s", marginalization_flag ? "reject" : "accept");
     ROS_DEBUG("%s", marginalization_flag ? "Non-keyframe" : "Keyframe");
     ROS_DEBUG("Solving %d", frame_count);
     ROS_DEBUG("number of feature: %d", f_manager.getFeatureCount());
     Headers[frame_count] = header;
-
+    /*2、 将图像数据、时间、临时预积分值存到图像帧类中*/
     ImageFrame imageframe(image, header.stamp.toSec());
     imageframe.pre_integration = tmp_pre_integration;
     all_image_frame.insert(make_pair(header.stamp.toSec(), imageframe));
+    /*3、更新临时预积分初始值*/
     tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
-    /*外参标定
+    /*4、判断是否需要进行外参标定
     VINS外参标定指的是对相机坐标系到IMU坐标系的变换矩阵进行在线标定与优化。
     在参数配置文件yaml中，参数estimate_extrinsic反映了外参的情况：
-    1、等于0表示这外参已经是准确的了，之后不需要优化；
-    2、等于1表示外参只是一个估计值，后续还需要将其作为初始值放入非线性优化中；
-    3、等于2表示不知道外参，需要进行标定，从代码estimator.cpp中的processImage()中的以下代码进入，主要是标定外参的旋转矩阵。
+    4.1、等于0表示这外参已经是准确的了，之后不需要优化；
+    4.2、等于1表示外参只是一个估计值，后续还需要将其作为初始值放入非线性优化中；
+    4.3、等于2表示不知道外参，需要进行标定，从代码estimator.cpp中的processImage()中的以下代码进入，主要是标定外参的旋转矩阵。
     */
+   //TODO change integration_base
     if(ESTIMATE_EXTRINSIC == 2)//如果没有外参则进行标定
     {
         ROS_INFO("calibrating extrinsic param, rotation movement is needed");
@@ -163,7 +173,7 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
         }
     }
 
-    //初始化入口
+    //5、初始化入口
     if (solver_flag == INITIAL)
     {
         /*frame_count表示目前滑动窗口中图像帧的数量,一开始初始化为0，WINDOW_SIZE=10
@@ -171,17 +181,17 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
         if (frame_count == WINDOW_SIZE)
         {
             bool result = false;
-            //有外参且当前帧时间戳大于初始化时间戳0.1秒，就进行初始化操作
+            //5.1有外参且当前帧时间戳大于初始化时间戳0.1秒，就进行初始化操作
             if( ESTIMATE_EXTRINSIC != 2 && (header.stamp.toSec() - initial_timestamp) > 0.1)
             {
-               //视觉惯性联合初始化
+               //5.2执行视觉惯性联合初始化
                result = initialStructure();
                //更新初始化时间戳
                initial_timestamp = header.stamp.toSec();
             }
             if(result)//初始化成功
             {
-                //先进行一次滑动窗口非线性优化，得到当前帧与第一帧的位姿
+                //5.3先进行一次滑动窗口非线性优化，得到当前帧与第一帧的位姿
                 solver_flag = NON_LINEAR;
                 solveOdometry();
                 slideWindow();
@@ -194,17 +204,19 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
                 
             }
             else
-                slideWindow();//初始化失败则直接滑动窗口
+                slideWindow();//初始化失败则直接进行滑窗操作
         }
         else
             frame_count++;//图像帧数量+1
     }
+    //6、solver_flag==NON_LINEAR进行非线性优化
     else
     {
         TicToc t_solve;
+        //6.1、执行非线性优化具体函数solveOdometry()
         solveOdometry();
         ROS_DEBUG("solver costs: %fms", t_solve.toc());
-
+        //6.2、检测系统运行是否失败，若失败则重置估计器
         if (failureDetection())
         {
             ROS_WARN("failure detection!");
@@ -216,7 +228,9 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
         }
 
         TicToc t_margin;
+        //6.3、执行窗口滑动函数slideWindow();
         slideWindow();
+        //6.4、去除估计失败的点并发布关键点位置
         f_manager.removeFailures();
         ROS_DEBUG("marginalization costs: %fms", t_margin.toc());
         // prepare output of VINS

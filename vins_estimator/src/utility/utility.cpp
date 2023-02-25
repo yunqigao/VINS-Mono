@@ -1,3 +1,4 @@
+/*各种四元数、矩阵转换*/
 #include "utility.h"
 
 Eigen::Matrix3d Utility::g2R(const Eigen::Vector3d &g)

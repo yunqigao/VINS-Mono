@@ -1,3 +1,4 @@
+/*特征点管理，三角化，关键帧等*/
 #include "feature_manager.h"
 
 int FeaturePerId::endFrame()
@@ -40,8 +41,12 @@ int FeatureManager::getFeatureCount()
     }
     return cnt;
 }
-
-
+/*
+其中论文中对于关键帧的选择（论文IV A部分）：
+两个关键帧选择标准：
+1、与上一个关键帧的平均视差。如果在当前帧和最新关键帧之间跟踪的特征点的平均视差超出某个特定阈值，则将该帧视为新的关键帧。
+2、跟踪质量。如果跟踪的特征数量低于某一阈值，则将此帧视为新的关键帧。这个标准是为了避免跟踪特征完全丢失。
+*/
 bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, double td)
 {
     ROS_DEBUG("input feature: %d", (int)image.size());
@@ -122,6 +127,7 @@ vector<pair<Vector3d, Vector3d>> FeatureManager::getCorresponding(int frame_coun
     vector<pair<Vector3d, Vector3d>> corres;
     for (auto &it : feature)
     {
+        //start_frame frame_count_l frame_count_r end_frame
         if (it.start_frame <= frame_count_l && it.endFrame() >= frame_count_r)
         {
             Vector3d a = Vector3d::Zero(), b = Vector3d::Zero();

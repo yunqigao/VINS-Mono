@@ -1,3 +1,4 @@
+/*相机位姿可视化*/
 #include "CameraPoseVisualization.h"
 
 const Eigen::Vector3d CameraPoseVisualization::imlt = Eigen::Vector3d(-1.0, -0.5, 1.0);

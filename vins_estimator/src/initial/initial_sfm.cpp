@@ -1,3 +1,4 @@
+/*纯视觉SFM、三角化、PNP*/
 #include "initial_sfm.h"
 
 GlobalSFM::GlobalSFM(){}

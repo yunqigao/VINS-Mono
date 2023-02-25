@@ -1,3 +1,5 @@
+/*视觉和IMU校准(陀螺仪偏置、尺度、重力加速度和速度)*/
+
 #include "initial_alignment.h"
 
 void solveGyroscopeBias(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs)

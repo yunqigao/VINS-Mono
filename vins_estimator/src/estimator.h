@@ -28,26 +28,30 @@ class Estimator
   public:
     Estimator();
 
-    void setParameter();
+    void setParameter();//设置部分参数
 
-    // interface
+    // interface 
+    //处理IMU数据，预积分
     void processIMU(double t, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
+    //处理图像特征数据
     void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const std_msgs::Header &header);
+    //重定位操作
     void setReloFrame(double _frame_stamp, int _frame_index, vector<Vector3d> &_match_points, Vector3d _relo_t, Matrix3d _relo_r);
 
     // internal
-    void clearState();
-    bool initialStructure();
-    bool visualInitialAlign();
+    void clearState();//清空或初始化滑动窗口中所有的状态量
+    bool initialStructure();//视觉的结构初始化
+    bool visualInitialAlign();//视觉惯性联合初始化
+    //判断两帧有足够视差30且内点数目大于12则可进行初始化，同时得到R和T
     bool relativePose(Matrix3d &relative_R, Vector3d &relative_T, int &l);
-    void slideWindow();
-    void solveOdometry();
+    void slideWindow();//滑动窗口法
+    void solveOdometry();//VIO非线性优化求解里程计
     void slideWindowNew();
     void slideWindowOld();
-    void optimization();
-    void vector2double();
-    void double2vector();
-    bool failureDetection();
+    void optimization();//基于滑动窗口的紧耦合的非线性优化，残差项的构造和求解
+    void vector2double();//vector转换成double数组，因为ceres使用数值数组
+    void double2vector();//数据转换，vector2double的相反过程
+    bool failureDetection();//检测系统运行是否失败
 
 
     enum SolverFlag

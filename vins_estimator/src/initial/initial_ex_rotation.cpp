@@ -1,3 +1,4 @@
+/*相机和IMU外参标定*/
 #include "initial_ex_rotation.h"
 
 InitialEXRotation::InitialEXRotation(){
@@ -71,7 +72,7 @@ bool InitialEXRotation::CalibrationExRotation(vector<pair<Vector3d, Vector3d>> c
     else
         return false;
 }
-
+/**/
 Matrix3d InitialEXRotation::solveRelativeR(const vector<pair<Vector3d, Vector3d>> &corres)
 {
     if (corres.size() >= 9)

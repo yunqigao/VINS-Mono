@@ -1,3 +1,4 @@
+/*读取参数*/
 #include "parameters.h"
 
 double INIT_DEPTH;
