@@ -253,6 +253,7 @@ bool Estimator::initialStructure()//视觉惯性联合初始化
     {
         map<double, ImageFrame>::iterator frame_it;
         Vector3d sum_g;//加速度和
+        cout<<"use image_size:"<<all_image_frame.size()<<endl;
         for (frame_it = all_image_frame.begin(), frame_it++; frame_it != all_image_frame.end(); frame_it++)
         {
             double dt = frame_it->second.pre_integration->sum_dt;
