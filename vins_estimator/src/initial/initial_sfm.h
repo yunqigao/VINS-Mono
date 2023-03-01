@@ -15,10 +15,10 @@ using namespace std;
 
 struct SFMFeature
 {
-    bool state;//状态,是否被三角化
-    int id;
-    vector<pair<int,Vector2d>> observation;//所有观测到该特征点的图像帧ID和图像坐标
-    double position[3];//3d坐标
+    bool state;//特征点的状态（是否被三角化）
+    int id;//特征点ID
+    vector<pair<int,Vector2d>> observation;////所有观测到该特征点的图像帧ID和 2D像素坐标
+    double position[3];//路标3D坐标
     double depth;//深度
 };
 

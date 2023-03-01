@@ -77,6 +77,7 @@ void RefineGravity(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vector
     map<double, ImageFrame>::iterator frame_j;
     for(int k = 0; k < 4; k++)
     {
+        //函数中的MatrixXd lxly(3, 2)= TangentBasis(g0);即对应[b1.b2]
         MatrixXd lxly(3, 2);
         lxly = TangentBasis(g0);
         int i = 0;
@@ -195,7 +196,10 @@ bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vect
     {
         return false;
     }
-
+    /*
+    考虑到上一步求得的g存在误差，一般认为重力矢量的模是已知的，因此重力向量只剩两个自由度，
+    在切线空间上用两个变量重新参数化重力，
+    */
     RefineGravity(all_image_frame, g, x);
     s = (x.tail<1>())(0) / 100.0;
     (x.tail<1>())(0) = s;
@@ -205,7 +209,7 @@ bool LinearAlignment(map<double, ImageFrame> &all_image_frame, Vector3d &g, Vect
     else
         return true;
 }
-
+//视觉惯性校准（IMU预积分与视觉结构对齐）
 bool VisualIMUAlignment(map<double, ImageFrame> &all_image_frame, Vector3d* Bgs, Vector3d &g, VectorXd &x)
 {
     solveGyroscopeBias(all_image_frame, Bgs);

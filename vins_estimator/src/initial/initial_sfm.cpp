@@ -115,8 +115,12 @@ void GlobalSFM::triangulateTwoFrames(int frame0, Eigen::Matrix<double, 3, 4> &Po
 //  c_translation cam_R_w
 // relative_q[i][j]  j_q_i
 // relative_t[i][j]  j_t_ji  (j < i)
-/* 纯视觉sfm，求解窗口中所有图像帧的位姿QT（相对于第l帧）和特征点坐标sfm_tracked_points
-   frame_num=frame_count + 1=11，frame_num-1表示当前帧*/
+/* 	纯视觉sfm，求解窗口中所有图像帧的位姿QT（相对于第l帧）和特征点坐标sfm_tracked_points
+   	frame_num:示目前滑动窗口中图像帧的数量,一开始初始化为0，WINDOW_SIZE=10,表示滑动窗口中存储第0帧~第10帧的信息
+	frame_num=frame_count + 1=11，frame_num-1表示当前帧
+	将f_manager中的所有feature保存到vector<SFMFeature> sfm_f中
+	sfm_tracked_points：特征点坐标
+*/
 bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
 			  const Matrix3d relative_R, const Vector3d relative_T,
 			  vector<SFMFeature> &sfm_f, map<int, Vector3d> &sfm_tracked_points)

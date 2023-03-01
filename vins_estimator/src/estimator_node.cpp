@@ -261,22 +261,23 @@ void process()
             return (measurements = getMeasurements()).size() != 0;
                  });
         lk.unlock();
+        // measurements拿到了每一份对齐的数据！
         m_estimator.lock();
         // 2.对measurements中的每一个measurement (IMUs,IMG)组合进行操作
-        for (auto &measurement : measurements)
+        for (auto &measurement : measurements)//循环每一份中的imu数据
         {
-            auto img_msg = measurement.second;
+            auto img_msg = measurement.second;//拿到每一份中的图片数据,k
             double dx = 0, dy = 0, dz = 0, rx = 0, ry = 0, rz = 0;
             for (auto &imu_msg : measurement.first)
             {
-                double t = imu_msg->header.stamp.toSec();
-                double img_t = img_msg->header.stamp.toSec() + estimator.td;
-                if (t <= img_t)
+                double t = imu_msg->header.stamp.toSec();//获取imu数据的时间
+                double img_t = img_msg->header.stamp.toSec() + estimator.td;//获取图像数据的时间
+                if (t <= img_t)//imu < img 如果时间早于图像的时间
                 { 
                     if (current_time < 0)
                         current_time = t;
                     double dt = t - current_time;
-                    ROS_ASSERT(dt >= 0);
+                    ROS_ASSERT(dt >= 0);//检验条件是否成功,若失败则终端程序并输出文件/行数/条件.
                     current_time = t;
                     dx = imu_msg->linear_acceleration.x;
                     dy = imu_msg->linear_acceleration.y;
@@ -290,14 +291,18 @@ void process()
                     //printf("imu: dt:%f a: %f %f %f w: %f %f %f\n",dt, dx, dy, dz, rx, ry, rz);
 
                 }
-                else
+                else//imu > img如果时间晚于图像数据的时间！
                 {
-                    double dt_1 = img_t - current_time;
-                    double dt_2 = t - img_t;
+                    // 因为边界的数据一般很难对齐，所以可以以图像的时间为基准，插值算imu数据的时间
+                    //再进行imu传播的计算
+                    double dt_1 = img_t - current_time;//img_t - imu_t(k)
+                    //t为imu的时间，dt_2表示imu消息的时间戳和图像数据时间戳之间的差值
+                    double dt_2 = t - img_t;//imu_t(k+1) - img_t
                     current_time = img_t;
                     ROS_ASSERT(dt_1 >= 0);
                     ROS_ASSERT(dt_2 >= 0);
-                    ROS_ASSERT(dt_1 + dt_2 > 0);
+                    ROS_ASSERT(dt_1 + dt_2 > 0);//确保这些时间差是大于零的
+                    //利用线性插值计算img_t时刻的线加速度和角速度！
                     double w1 = dt_2 / (dt_1 + dt_2);
                     double w2 = dt_1 / (dt_1 + dt_2);
                     dx = w1 * dx + w2 * imu_msg->linear_acceleration.x;
@@ -308,22 +313,26 @@ void process()
                     rz = w1 * rz + w2 * imu_msg->angular_velocity.z;
                     /*2.1 对于measurement中的每一个imu_msg，计算dt并执行processIMU()。
                     processIMU()实现了IMU的预积分，通过中值积分得到当前PQV作为优化初值*/
+                    std::cout << "dt:" << dt_1 << std::endl;
                     estimator.processIMU(dt_1, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz));
                     //printf("dimu: dt:%f a: %f %f %f w: %f %f %f\n",dt_1, dx, dy, dz, rx, ry, rz);
                 }
             }
+            //上面一帧图像对应的IMU数据积分完了！
             // set relocalization frame
             // 2.2在relo_buf中取出最后一个重定位帧，拿出其中的信息并执行setReloFrame()
+            //这里先定义一个图像帧的指针
             sensor_msgs::PointCloudConstPtr relo_msg = NULL;
             while (!relo_buf.empty())
             {
+                //如果存在重定位帧
                 relo_msg = relo_buf.front();
                 relo_buf.pop();
-            }
+            }//上面的操作是取最后一帧
             if (relo_msg != NULL)
-            {
+            {//如果需要重定位
                 vector<Vector3d> match_points;
-                double frame_stamp = relo_msg->header.stamp.toSec();
+                double frame_stamp = relo_msg->header.stamp.toSec();//获取时间戳
                 for (unsigned int i = 0; i < relo_msg->points.size(); i++)
                 {
                     Vector3d u_v_id;
@@ -331,12 +340,12 @@ void process()
                     u_v_id.y() = relo_msg->points[i].y;
                     u_v_id.z() = relo_msg->points[i].z;
                     match_points.push_back(u_v_id);
-                }
+                }//把特征点放入match_points中
                 Vector3d relo_t(relo_msg->channels[0].values[0], relo_msg->channels[0].values[1], relo_msg->channels[0].values[2]);
                 Quaterniond relo_q(relo_msg->channels[0].values[3], relo_msg->channels[0].values[4], relo_msg->channels[0].values[5], relo_msg->channels[0].values[6]);
-                Matrix3d relo_r = relo_q.toRotationMatrix();
+                Matrix3d relo_r = relo_q.toRotationMatrix();//获取到位姿信息
                 int frame_index;
-                frame_index = relo_msg->channels[0].values[7];
+                frame_index = relo_msg->channels[0].values[7];//获取帧号。
                 // 设置重定位帧
                 estimator.setReloFrame(frame_stamp, frame_index, match_points, relo_t, relo_r);
             }
@@ -347,19 +356,20 @@ void process()
             //2.3.建立每个特征点的(camera_id,[x,y,z,u,v,vx,vy])s的map，索引为feature_id
             map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> image;
             for (unsigned int i = 0; i < img_msg->points.size(); i++)
-            {
-                int v = img_msg->channels[0].values[i] + 0.5;
-                int feature_id = v / NUM_OF_CAM;
-                int camera_id = v % NUM_OF_CAM;
-                double x = img_msg->points[i].x;
+            {//遍历当前帧中的每一个特征点！
+                int v = img_msg->channels[0].values[i] + 0.5;//第i个特征点的ID值
+                int feature_id = v / NUM_OF_CAM;//获取点id
+                int camera_id = v % NUM_OF_CAM;//获取相机号
+                double x = img_msg->points[i].x;//获取特征点的坐标！
                 double y = img_msg->points[i].y;
                 double z = img_msg->points[i].z;
-                double p_u = img_msg->channels[1].values[i];
-                double p_v = img_msg->channels[2].values[i];
-                double velocity_x = img_msg->channels[3].values[i];
-                double velocity_y = img_msg->channels[4].values[i];
+                double p_u = img_msg->channels[1].values[i];//第i个特征点的u坐标
+                double p_v = img_msg->channels[2].values[i];//第i个特征点的v坐标
+                double velocity_x = img_msg->channels[3].values[i];//第i个特征点的x向速度
+                double velocity_y = img_msg->channels[4].values[i];//第i个特征点的y向速度
                 /* double x,y,z,p_u,p_v,velocity_x,velocity_y     */
                 ROS_ASSERT(z == 1);///判断是否归一化了    Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
+                //保存每个特征点的信息！
                 Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
                 xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
                 image[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
@@ -394,7 +404,7 @@ void process()
         m_buf.lock();
         m_state.lock();
         if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
-            update();
+            update();//更新状态信息！
         m_state.unlock();
         m_buf.unlock();
     }

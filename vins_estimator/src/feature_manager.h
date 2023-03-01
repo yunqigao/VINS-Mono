@@ -14,8 +14,10 @@ using namespace Eigen;
 #include <ros/assert.h>
 
 #include "parameters.h"
-
-class FeaturePerFrame
+//https://blog.csdn.net/liuzheng1/article/details/90052050
+/*它指的是空间特征点P1映射到frame1或frame2上对应的图像坐标、特征点的跟踪速度、
+空间坐标等属性都封装到类FeaturePerFrame中，*/
+class FeaturePerFrame//一个特征点的属性
 {
   public:
     FeaturePerFrame(const Eigen::Matrix<double, 7, 1> &_point, double td)
@@ -27,12 +29,12 @@ class FeaturePerFrame
         uv.y() = _point(4);
         velocity.x() = _point(5); 
         velocity.y() = _point(6); 
-        cur_td = td;
+        cur_td = td;//IMU与cam同步时间差
     }
-    double cur_td;
-    Vector3d point;
-    Vector2d uv;
-    Vector2d velocity;
+    double cur_td;//imu-camera的不同步时的相差时间
+    Vector3d point;//特征点空间坐标
+    Vector2d uv;//特征点映射到该帧上的图像坐标
+    Vector2d velocity;//特征点的跟踪速度
     double z;
     bool is_used;
     double parallax;
@@ -40,31 +42,35 @@ class FeaturePerFrame
     VectorXd b;
     double dep_gradient;
 };
-
+/*管理一个特征点 ID（看到该特征点的所有帧）某feature_id下的所有FeaturePerFrame
+*/
 class FeaturePerId
 {
   public:
-    const int feature_id;
-    int start_frame;
-    vector<FeaturePerFrame> feature_per_frame;
+    const int feature_id;//特征点id
+    int start_frame;//第一次出现该特征点的帧号
+    vector<FeaturePerFrame> feature_per_frame;//管理对应帧的属性
 
-    int used_num;
+    int used_num;//出现的次数
     bool is_outlier;
     bool is_margin;
-    double estimated_depth;
-    int solve_flag; // 0 haven't solve yet; 1 solve succ; 2 solve fail;
+    double estimated_depth;//逆深度
+    int solve_flag; // 0 haven't solve yet; 1 solve succ; 2 solve fail;该特征点的状态，是否被三角化
 
     Vector3d gt_p;
 
-    FeaturePerId(int _feature_id, int _start_frame)
+    FeaturePerId(int _feature_id, int _start_frame)//以feature_id为索引，并保存了出现该角点的第一帧的id
         : feature_id(_feature_id), start_frame(_start_frame),
           used_num(0), estimated_depth(-1.0), solve_flag(0)
     {
     }
 
-    int endFrame();
+    int endFrame();//得到该特征点最后一次跟踪到的帧号
 };
-
+/*
+上述是对一个特征点讨论的，如果是对所有的特征点进行讨论的话，
+则可以构建list容器，存储每一个特征点，对应的示意图如下：
+*/
 class FeatureManager
 {
   public:
@@ -90,7 +96,7 @@ class FeatureManager
     void removeBack();
     void removeFront(int frame_count);
     void removeOutlier();
-    list<FeaturePerId> feature;
+    list<FeaturePerId> feature;//滑框内所有路标点
     int last_track_num;
 
   private:

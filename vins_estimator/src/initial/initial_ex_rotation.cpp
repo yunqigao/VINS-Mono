@@ -9,9 +9,7 @@ InitialEXRotation::InitialEXRotation(){
     ric = Matrix3d::Identity();
 }
 /*
-CalibrationExRotation() 标定外参旋转矩阵
-该函数目的是标定外参的旋转矩阵。由于函数内部并不复杂，将所有内部调用的函数也放在一起介绍。
-1、solveRelativeR(corres)根据对极几何计算相邻帧间相机坐标系的旋转矩阵，这里的corres传入的是当前帧和其之前一帧的对应特征点对的归一化坐标。
+CalibrationExRotation()该函数目的是标定外参的旋转矩阵。
 */
 bool InitialEXRotation::CalibrationExRotation(vector<pair<Vector3d, Vector3d>> corres, Quaterniond delta_q_imu, Matrix3d &calib_ric_result)
 {
@@ -72,7 +70,8 @@ bool InitialEXRotation::CalibrationExRotation(vector<pair<Vector3d, Vector3d>> c
     else
         return false;
 }
-/**/
+/*1、solveRelativeR(corres)根据对极几何计算相邻帧间相机坐标系的旋转矩阵，
+这里的corres传入的是当前帧和其之前一帧的对应特征点对的归一化坐标。*/
 Matrix3d InitialEXRotation::solveRelativeR(const vector<pair<Vector3d, Vector3d>> &corres)
 {
     if (corres.size() >= 9)

@@ -42,7 +42,6 @@ class Estimator
     void clearState();//清空或初始化滑动窗口中所有的状态量
     bool initialStructure();//视觉的结构初始化
     bool visualInitialAlign();//视觉惯性联合初始化
-    //判断两帧有足够视差30且内点数目大于12则可进行初始化，同时得到R和T
     bool relativePose(Matrix3d &relative_R, Vector3d &relative_T, int &l);
     void slideWindow();//滑动窗口法
     void solveOdometry();//VIO非线性优化求解里程计
@@ -96,7 +95,7 @@ class Estimator
     int frame_count;
     int sum_of_outlier, sum_of_back, sum_of_front, sum_of_invalid;
 
-    FeatureManager f_manager;
+    FeatureManager f_manager;//特征管理器类
     MotionEstimator m_estimator;
     InitialEXRotation initial_ex_rotation;
 
